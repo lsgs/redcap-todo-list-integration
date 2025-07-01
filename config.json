@@ -1,0 +1,100 @@
+{
+    "name": "To-Do List Integration",
+    "description": "Extending the Control Center To-Do List with requests from records originating in projects where the module is enabled and configured.",
+    "namespace": "MCRI\\ToDoListIntegration",
+    "authors": [
+        {
+            "name": "Luke Stevens",
+            "email": "luke.stevens@mcri.edu.au",
+            "institution": "Murdoch Children's Research Institute"
+        }
+    ],
+    "framework-version": 16,
+    "enable-every-page-hooks-on-system-pages": true,
+    "auth-ajax-actions": [ "complete-request" ],
+    "system-settings": [ ],
+    "project-settings": [
+        {
+            "key": "section-header-trigger",
+            "name": "<div class=\"header\" style=\"position:relative;left:-8px;width:733px\"><h4>To-Do List Request Trigger</h4></div>",
+            "type": "descriptive"
+        },
+        {
+            "name": "Trigger form(s)<br>Evaluate trigger condition on save of this form",
+            "key": "trigger-form",
+            "repeatable": true,
+            "type": "form-list"
+        },
+        {
+            "name": "Trigger condition<br>REDCap logic syntax: request created when this condition is true and Request ID field (specified below) is empty.",
+            "key": "trigger-logic",
+            "required": true,
+            "type": "text"
+        },
+        {
+            "key": "section-header-field-mapping",
+            "name": "<div class=\"header\" style=\"position:relative;left:-8px;width:733px\"><h4>To-Do List Field Mapping</h4></div>",
+            "type": "descriptive"
+        },
+        {
+            "name": "Request ID<br><span class=\"text-muted\">Field in which to store the to-do list request id key value generated for this record.</span>",
+            "key": "request-id",
+            "type": "field-list",
+            "required": true
+        },
+        {
+            "name": "Request From<br><span class=\"text-muted\">Field containing username or user-id (ui_id) of user originating the request.<br><span class=\"text-danger font-weight-bold\">A valid username or id is required for To-Do List requests to be created.</span></span>",
+            "key": "request-from",
+            "type": "field-list",
+            "required": true
+        },
+        {
+            "name": "Request To<br><span class=\"text-muted\">Field containing email address for to-do list notification</span>",
+            "key": "request-to",
+            "type": "field-list",
+            "required": false
+        },
+        {
+            "name": "To-Do Type<br><span class=\"text-muted\">Field containing type/category text for request</span>",
+            "key": "request-type",
+            "type": "field-list",
+            "required": true
+        },
+        {
+            "name": "To-Do Type ID<br><span class=\"text-muted\">Field containing type/category id for request.<br>Generally NULL/empty; if specified, must be unique for project and to-do type.</span>",
+            "key": "request-type-id",
+            "type": "field-list",
+            "required": false
+        },
+        {
+            "name": "Action URL<br><span class=\"text-muted\">Field containing the URL to launch in the To-Do list page.<br>Leave empty to utilise the module's built-in, default Request Completion page.<br>(If specified, will get <code>&request_id=n</code> appended in to-do list.)</span>",
+            "key": "request-action-url",
+            "type": "field-list",
+            "required": false
+        },
+        {
+            "name": "Project ID<br><span class=\"text-muted\">Field containing Project ID for the request.</span>",
+            "key": "request-project-id",
+            "type": "field-list",
+            "required": false
+        },
+        {
+            "name": "To-Do Comment<br><span class=\"text-muted\">Field containing comment text for the request.</span>",
+            "key": "request-comment",
+            "type": "field-list",
+            "required": false
+        },
+        {
+            "key": "section-header-fail-alert",
+            "name": "<div class=\"header\" style=\"position:relative;left:-8px;width:733px\"><h4>Failure Alerts</h4>Alert these people if process fails",
+            "type": "descriptive"
+        },
+        {
+            "key": "fail-alert-email",
+            "name": "Email address for failure alert recipient",
+            "required": false,
+            "type": "email",
+            "repeatable": true
+        }
+    ]
+}
