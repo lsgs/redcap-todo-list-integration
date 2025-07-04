@@ -1,6 +1,6 @@
 {
     "name": "To-Do List Integration",
-    "description": "Extending the Control Center To-Do List with requests from records originating in projects where the module is enabled and configured.",
+    "description": "Extending the Control Center To-Do List with requests from records originating in projects where the module is enabled and configured. <span style=\"visibility:hidden;\">todo</span>",
     "namespace": "MCRI\\ToDoListIntegration",
     "authors": [
         {
@@ -12,7 +12,27 @@
     "framework-version": 16,
     "enable-every-page-hooks-on-system-pages": true,
     "auth-ajax-actions": [ "complete-request" ],
-    "system-settings": [ ],
+    "system-settings": [ 
+        {
+            "key": "todo-type",
+            "name": "To-Do List Type / Table Row Background Colours<br>Override the default table row background colour for each to-do list type",
+            "required": false,
+            "type": "sub_settings",
+            "repeatable": true,
+            "sub_settings": [
+                {
+                    "key": "todo-list-type",
+                    "name": "To-Do List Type text",
+                    "type": "text"
+                },
+                {
+                    "key": "todo-list-type-rgb",
+                    "name": "Colour value (HTML RGB or rgb())",
+                    "type": "text"
+                }
+            ]
+        }
+    ],
     "project-settings": [
         {
             "key": "section-header-trigger",

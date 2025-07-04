@@ -19,31 +19,77 @@ class ToDoListIntegration extends AbstractExternalModule
     private $source_field_request_id;
 
     public function redcap_every_page_top($project_id) {
-        if (!defined('PAGE') || PAGE!=='ToDoList/index.php') return;
-        ?>
-        <script type="text/javascript">
-            $(function(){
-                // External Module ToDoListIntegration: remove clickability of request comment (use buttons instead) and show whole comment (making URLs into hyperlinks)
-                let replacePattern = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gim;
-                $('p.todo-comment').each(function() {
-                    let thisComment = $(this).attr('data-comment').replace(replacePattern, '<a href="$1" target="_blank">$1</a>');
-                    $(this).html(thisComment);
+        if (!defined('PAGE') || !defined('USERID')) return;
+
+        if (!is_null($project_id)) return;
+
+        $user = $this->getUser();
+        if (!isset($user) || !$user->isSuperUser()) return;
+
+        // superuser on non-project page - get count of pending To-Do List items and add as navbar badge
+        $todoListItemsPending = \ToDoList::getTotalNumberRequestsByStatus('pending') + \ToDoList::getTotalNumberRequestsByStatus('low-priority');
+        if ($todoListItemsPending > 0) {
+            $todoListItemsPendingBadge = ' <a title="'.\RCView::tt_attr('control_center_446').'" href="'.APP_PATH_WEBROOT.'ToDoList/index.php"><span class="badgerc">'.$todoListItemsPending.'</span></a>';
+            ?>
+            <script type="text/javascript">
+                $(function(){
+                    $('a.nav-link[href*=ControlCenter]:first').append('<?=$todoListItemsPendingBadge?>');
                 });
-                setTimeout(function(){
-                    $('p.todo-comment').off('click');
-                },1000);
-            });
-        </script>
-        <style type="text/css">
-            .more-info-container .todo-comment:hover {
-                text-decoration: inherit;
-                cursor: auto;
+            </script>
+            <?php
+        }
+        
+        if (PAGE==='ToDoList/index.php') {
+            // on To-Do list page...
+            $system_settings = $this->getSystemSettings();
+            $typeBgCol = array();
+            if (isset($system_settings['todo-list-type']['value']) && is_array($system_settings['todo-list-type']['value'])) {
+                foreach ($system_settings['todo-list-type']['value'] as $idx => $value) {
+                    if (isset($system_settings['todo-list-type-rgb']['value'][$idx])) {
+                        $thisTypeBgCol = new \stdClass();
+                        $thisTypeBgCol->type = $this->escape($system_settings['todo-list-type']['value'][$idx]);
+                        $thisTypeBgCol->color = $this->escape($system_settings['todo-list-type-rgb']['value'][$idx]);
+                        $typeBgCol[] = $thisTypeBgCol;
+                    }
+                }
             }
-        </style>
-        <?php
+            ?>
+            <script type="text/javascript">
+                $(function(){
+                    // External Module ToDoListIntegration: remove clickability of request comment (use buttons instead) and show whole comment (making URLs into hyperlinks)
+                    let replacePattern = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gim;
+                    $('p.todo-comment').each(function() {
+                        let thisComment = $(this).attr('data-comment').replace(replacePattern, '<a href="$1" target="_blank">$1</a>');
+                        $(this).html(thisComment);
+                    });
+                    setTimeout(function(){
+                        $('p.todo-comment').off('click');
+                    },1000);
+                    // override default type/colour settings where set via system settings
+                    let mapTypeCol = <?=\json_encode_rc($typeBgCol)?>;
+                    try {
+                        mapTypeCol.forEach(function(e){
+                            console.log(e);
+                            let type = e.type;
+                            let color = e.color;
+                            $('p:contains("'+e.type+'")').parent('div.request-container').css('background-color', e.color);
+                        });
+                    } catch (error) {
+                        console.log(error);
+                    }
+                });
+            </script>
+            <style type="text/css">
+                .more-info-container .todo-comment:hover {
+                    text-decoration: inherit;
+                    cursor: auto;
+                }
+            </style>
+            <?php
+        }
     }
 
-	function redcap_save_record($project_id, $record=null, $instrument, $event_id, $group_id=null, $survey_hash=null, $response_id=null, $repeat_instance=1) {
+    function redcap_save_record($project_id, $record=null, $instrument, $event_id, $group_id=null, $survey_hash=null, $response_id=null, $repeat_instance=1) {
         global $Proj;
         $this->project_id = $project_id;
         $this->record = $record;
@@ -263,14 +309,14 @@ class ToDoListIntegration extends AbstractExternalModule
     }
 
     /**
-	 * notify()
+     * notify()
      * Send email notification to configured recipients
      * @param string $subject 
      * @param string $bodyDetail 
      * @return void
-	 */
-	protected function notify(string $subject,string $bodyDetail): void {
-		global $project_contact_email;
+     */
+    protected function notify(string $subject,string $bodyDetail): void {
+        global $project_contact_email;
         $bodyDetail = str_replace(PHP_EOL,'<br>',$bodyDetail);
         $failEmails = $this->getProjectSetting('fail-alert-email');
         if (is_array($failEmails) && count($failEmails)>0 && !empty($failEmails[0])) {
