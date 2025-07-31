@@ -351,7 +351,7 @@ class ToDoListIntegration extends AbstractExternalModule
     }
 
     protected function requestIsOpen(int $request_id): bool {
-        $sql = "select request_id from redcap_todo_list where status<>'completed' or and request_id=? ";
+        $sql = "select request_id from redcap_todo_list where status!='completed' and request_id=? ";
         return (bool)$this->readFirstValue($sql, [$request_id]);
     }
 
