@@ -15,7 +15,7 @@ if (!isset($user) || !$user->isSuperUser()) { redirect(APP_PATH_WEBROOT); }
 if (isset($_GET['request_id']) && intval($_GET['request_id']) > 0) {
     $module->page_confirm_complete(intval($_GET['request_id']));
 } else {
-    echo $module->errorMessage();
+    echo $module->errorMessage('missing request id');
 }
 
 require_once APP_PATH_DOCROOT . 'ProjectGeneral/header.php';

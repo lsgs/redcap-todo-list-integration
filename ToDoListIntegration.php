@@ -89,7 +89,7 @@ class ToDoListIntegration extends AbstractExternalModule
         }
     }
 
-    function redcap_save_record($project_id, $record=null, $instrument, $event_id, $group_id=null, $survey_hash=null, $response_id=null, $repeat_instance=1) {
+    function redcap_save_record($project_id, $record, $instrument, $event_id, $group_id=null, $survey_hash=null, $response_id=null, $repeat_instance=1) {
         global $Proj;
         $this->project_id = $project_id;
         $this->record = $record;
@@ -351,14 +351,14 @@ class ToDoListIntegration extends AbstractExternalModule
     }
 
     protected function requestIsOpen(int $request_id): bool {
-        $sql = "select request_id from redcap_todo_list where status='pending' and request_id=? ";
+        $sql = "select request_id from redcap_todo_list where status<>'completed' or and request_id=? ";
         return (bool)$this->readFirstValue($sql, [$request_id]);
     }
 
     public function page_confirm_complete(int $request_id): void {
         // verify request id is valid, open request
         if (!$this->requestIsOpen($request_id)) {
-            echo $this->errorMessage();
+            echo $this->errorMessage("request $request_id not open");
             return;
         } 
 
@@ -407,7 +407,8 @@ class ToDoListIntegration extends AbstractExternalModule
         return ($result) ? 1 : 0;
     }
 
-    public function errorMessage(): string {
-        return '<div class="red">'.\RCView::tt('global_01').'</div>';
+    public function errorMessage($msg): string {
+        $msg = \RCView::tt('global_01').((empty($msg)) ? '' : \RCView::tt('colon').' '.$msg);
+        return "<div class='red'>$msg</div>";
     }
 }
