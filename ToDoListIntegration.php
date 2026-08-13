@@ -20,8 +20,9 @@ class ToDoListIntegration extends AbstractExternalModule
 
     public function redcap_every_page_top($project_id) {
         if (!defined('PAGE') || !defined('USERID')) return;
-
         if (!is_null($project_id)) return;
+        if (defined("API") && API) return;
+        if (defined("NOAUTH") && NOAUTH) return;
 
         $user = $this->getUser();
         if (!isset($user) || !$user->isSuperUser()) return;
@@ -53,30 +54,89 @@ class ToDoListIntegration extends AbstractExternalModule
                     }
                 }
             }
+
+            if (count($typeBgCol)) {
+                echo "<style type=\"text/css\">\n";
+                echo "  /* External Module ToDoListIntegration: Row colors by request type — target td to override Bootstrap's table-striped/hover */\n";
+                foreach ($typeBgCol as $type) {
+                    echo "tr.request-row[data-todo-type=\"{$type->type}\"] td { background-color: {$type->color} !important; } /* custom type color */\n";
+                }
+                echo "</style>\n";
+            }
+            $this->initializeJavascriptModuleObject();
             ?>
+            <!-- External Module ToDoListIntegration: enlarge comment dialog textarea -->
+            <style type="text/css">
+                textarea.comment-text { 
+                    width: 100% !important; 
+                    min-height: 150px !important;
+                    resize: vertical; 
+                }
+                .todo-tweak-comment {
+                    margin-top: 0.5em;
+                    padding-left: 0.5em;
+                    border-left: solid #aaa 3px
+                }
+            </style>
             <script type="text/javascript">
+                // External Module ToDoListIntegration: remove clickability of request comment (use buttons instead) and show whole comment (making URLs into hyperlinks)
                 $(function(){
-                    // External Module ToDoListIntegration: remove clickability of request comment (use buttons instead) and show whole comment (making URLs into hyperlinks)
-                    let replacePattern = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gim;
-                    $('p.todo-comment').each(function() {
-                        let thisComment = $(this).attr('data-comment').replace(replacePattern, '<a href="$1" target="_blank">$1</a>');
-                        $(this).html(thisComment);
-                    });
-                    setTimeout(function(){
-                        $('p.todo-comment').off('click');
-                    },1000);
-                    // override default type/colour settings where set via system settings
-                    let mapTypeCol = <?=\json_encode_rc($typeBgCol)?>;
-                    try {
-                        mapTypeCol.forEach(function(e){
-                            console.log(e);
-                            let type = e.type;
-                            let color = e.color;
-                            $('p:contains("'+e.type+'")').parent('div.request-container').css('background-color', e.color);
+                    var module = <?=$this->getJavascriptModuleObjectName()?>;
+
+                    module.link_replace_pattern = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gim;
+                    module.comment_text = '<?= \htmlspecialchars(\REDCap::filterHtml(\RCView::tt('control_center_4559', false)), ENT_QUOTES) ?>'
+                    
+                    module.tweakDialog = function(target) {
+                        $('#todoCommentDialog').closest('.ui-dialog').width('600px');
+                    };
+
+                    module.tweakInfo = function(info_row) {
+                        //console.log('DOM detected a new row:', info_row);
+                        let request_id = $(info_row).prev().data('request-id');
+                        let commentParagraph = $(info_row).find('p.todo-more-info').eq(1);
+                        $(commentParagraph).append('<i class="fa-solid fa-spinner fa-spin ml-1"></i>');
+                        module.ajax('get-request-comment', request_id).then(function(response) {
+                            if (response) {
+                                // make any URLs into hyperlinks
+                                let thisComment = response.replace(module.link_replace_pattern, '<a href="$1" target="_blank">$1</a>');
+                                $(commentParagraph).html(module.comment_text+'<div class="todo-tweak-comment">'+thisComment+'</div>');
+                                $(commentParagraph).find('a').attr('target','_blank');
+
+                            } else {
+                                console.log('Error retrieving comment for request_id=', request_id);
+                                $(commentParagraph).find('i').hide();
+                            }
                         });
-                    } catch (error) {
-                        console.log(error);
-                    }
+                    };
+
+                    module.table_observer = new MutationObserver(function(mutationsList) {
+                        for (var mutation of mutationsList) {
+                            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                                // Check if any of the added nodes are table rows
+                                $(mutation.addedNodes).each(function() {
+                                    if (this.nodeName === 'TR') {
+                                        module.tweakInfo(this);
+                                    }
+                                });
+                            }
+                        }
+                    });
+
+                    module.init = function() {
+                        $('body').on('dialogopen', function(e){
+                            if(e.target.id=='todoCommentDialog') module.tweakDialog();
+                        });
+
+                        // observe the to-do list tables to detect when tr.info-detail-row added
+                        const observe_targets = document.querySelectorAll('#pendingTable tbody, #lowPriorityTable tbody, #archivedTable tbody');
+                        observe_targets.forEach(element => {
+                            module.table_observer.observe(element, { childList: true });
+                        });
+                    };
+
+                    $(document).ready(function() {
+                        module.init(); 
+                    });
                 });
             </script>
             <style type="text/css">
@@ -114,7 +174,6 @@ class ToDoListIntegration extends AbstractExternalModule
             if (empty($request[0])) {
                 throw new \Exception("No username/id specified for to-do list request");
             }
-
 
             $request_id = $this->createToDoListRequest($request);
             if (empty($request_id)) {
@@ -336,16 +395,16 @@ class ToDoListIntegration extends AbstractExternalModule
      */
     protected function notify_exception(\Throwable $th): void {
         $url = APP_PATH_WEBROOT_FULL."DataEntry/index.php?pid=$this->project_id&id=$this->record&page=$this->instrument&event_id=$this->event_id&instance=$this->repeat_instance";
-        $title = "To-Do List Integration External Module Exception Notification (pid=$this->project_id; record=$this->record)";
+        $title = "To-Do List Integration External Module Exception Notification (pid={$this->project_id}; record={$this->record})";
         $detail = "<h4>$title</h4>";
         $detail .= $th->getMessage();
         $detail .= "<p>";
-        $detail .= "pid=$this->project_id <br>";
-        $detail .= "record=$this->record <br>";
-        $detail .= "instrument=$this->instrument <br>";
-        $detail .= "event_id=$this->event_id <br>";
-        $detail .= "instance=$this->repeat_instance <br>";
-        $detail .= "</p><p><a href='$url'>$url</a></p>".
+        $detail .= "pid={$this->project_id} <br>";
+        $detail .= "record={$this->record} <br>";
+        $detail .= "instrument={$this->instrument} <br>";
+        $detail .= "event_id={$this->event_id} <br>";
+        $detail .= "instance={$this->repeat_instance} <br>";
+        $detail .= "</p><p><a href='$url'>$url</a></p>";
 
         $this->notify($title, $detail);
     }
@@ -394,20 +453,28 @@ class ToDoListIntegration extends AbstractExternalModule
      * redcap_module_page_ajax()
      * Record to-do list request completed
      */
-    public function redcap_module_ajax($action, $payload, $project_id, $record, $instrument, $event_id, $repeat_instance, $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
-        if ($action != 'complete-request') return 0;
+    public function redcap_module_ajax(string $action, mixed $payload, mixed $project_id, ?string $record, ?string $instrument, ?int $event_id, ?int $repeat_instance, ?string $survey_hash, ?string $response_id, ?string $survey_queue_hash, ?string $page, ?string $page_full, ?string $user_id, ?int $group_id) {
         $user = $this->getUser();
         if (!isset($user) || !$user->isSuperUser()) return 0;
 
-        $request_id = intval($payload);
-        if (!$this->requestIsOpen($request_id)) return 0;
-        $pid = $this->readFirstValue("select project_id from redcap_todo_list where request_id=? ", [$request_id]);
-        $type = $this->readFirstValue("select todo_type from redcap_todo_list where request_id=? ", [$request_id]);
-        $result = \ToDoList::updateTodoStatus($pid,$type,'completed',null,$request_id);
-        return ($result) ? 1 : 0;
+        $request_id = intval($payload); 
+
+        if ($action === 'complete-request') {
+            if (!$this->requestIsOpen($request_id)) return 0;
+            $pid = $this->readFirstValue("select project_id from redcap_todo_list where request_id=? ", [$request_id]);
+            $type = $this->readFirstValue("select todo_type from redcap_todo_list where request_id=? ", [$request_id]);
+            $result = \ToDoList::updateTodoStatus($pid,$type,'completed',null,$request_id);
+            return ($result) ? 1 : 0;
+
+        } else if ($action === 'get-request-comment') {
+            $comment = $this->readFirstValue("select comment from redcap_todo_list where request_id=? ", [$request_id]);
+            $comment = (empty($comment)) ? \RCView::tt('global_75') : $comment; // None
+            return \REDCap::filterHtml(str_replace("\n", '<br>', $comment));
+        }
+        return 0;
     }
 
-    public function errorMessage($msg): string {
+    public function errorMessage(string $msg): string {
         $msg = \RCView::tt('global_01').((empty($msg)) ? '' : \RCView::tt('colon').' '.$msg);
         return "<div class='red'>$msg</div>";
     }

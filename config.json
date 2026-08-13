@@ -10,8 +10,9 @@
         }
     ],
     "framework-version": 16,
+    "compatibility": { "redcap-version-min": "17.0.6" },
     "enable-every-page-hooks-on-system-pages": true,
-    "auth-ajax-actions": [ "complete-request" ],
+    "auth-ajax-actions": [ "complete-request", "get-request-comment" ],
     "system-settings": [ 
         {
             "key": "todo-type",
